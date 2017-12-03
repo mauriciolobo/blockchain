@@ -1,4 +1,6 @@
 const SHA256 = require("crypto-js/sha256");
+const _ = require("lodash");
+const GUID = require("guid");
 
 class Block {
   constructor(index, timestamp, data, previousHash = "") {
@@ -7,21 +9,31 @@ class Block {
     this.data = data;
     this.previousHash = previousHash;
     this.hash = this.calculateHash();
+    this.nounce = 0;
   }
 
   calculateHash() {
     return SHA256(
       this.index +
-        this.timestamp +
-        JSON.stringify(this.data) +
-        this.previousHash
+      this.timestamp +
+      JSON.stringify(this.data) +
+      this.previousHash + this.nounce
     ).toString();
+  }
+
+  mineBlock(difficulty) {
+    console.log('minning dificult: ' + difficulty);
+    while (this.hash.substring(0, difficulty) !== Array(difficulty + 1).join("0")) {
+      this.nounce++;
+      this.hash = this.calculateHash();
+    }
   }
 }
 
 class Blockchain {
   constructor() {
     this.chain = [this.getGenesisBlock()];
+    this.difficultyLog = 16;
   }
 
   getGenesisBlock() {
@@ -34,7 +46,7 @@ class Blockchain {
 
   addBlock(newBlock) {
     newBlock.previousHash = this.getLastBlock().hash;
-    newBlock.hash = newBlock.calculateHash();
+    newBlock.mineBlock(Math.floor(Math.log2(this.difficultyLog++)));
     this.chain.push(newBlock);
   }
 
@@ -57,9 +69,22 @@ class Blockchain {
 }
 
 const mlCoin = new Blockchain();
-mlCoin.addBlock(new Block(1, Date.now(), { amount: 5 }));
-mlCoin.addBlock(new Block(2, Date.now(), { amount: 10 }));
 
-console.log(mlCoin);
+const wallet = GUID.create().toString();
+for (let index = 1; index <= 10; index++) {
+  console.log('minning...');
+  mlCoin.addBlock(new Block(index++, Date.now(), {
+    wallet: wallet,
+    amount: 10.0
+  }));
 
-console.log(mlCoin.isChainValid());
+  const walletTransactions = _.filter(mlCoin.chain, b => {
+    return b.data.wallet == wallet
+  });  
+
+  let walletAmount = 0; 
+  _.forEach(walletTransactions, b=>{
+    walletAmount += b.data.amount;
+  });
+  console.log('Wallet "' + wallet +' amount ": ml$', walletAmount);
+}
