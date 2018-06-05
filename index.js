@@ -1,66 +1,61 @@
-const SHA256 = require("crypto-js/sha256");
-const _ = require("lodash");
-const GUID = require("guid");
+const crypto = require('crypto');
 
 class Block {
-  constructor(index, timestamp, data, previousHash = "") {
-    this.index = index;
+  constructor(timestamp, lastHash, hash, data) {
     this.timestamp = timestamp;
+    this.hash = hash;
+    this.lastHash = lastHash;
     this.data = data;
-    this.previousHash = previousHash;
-    this.hash = this.calculateHash();
-    this.nounce = 0;
   }
 
-  calculateHash() {
-    return SHA256(
-      this.index +
-      this.timestamp +
-      JSON.stringify(this.data) +
-      this.previousHash + this.nounce
-    ).toString();
+  static genesis() {
+    return new Block(Date.now(), '', 'g3n3515', undefined);
   }
 
-  mineBlock(difficulty) {
-    console.log('minning dificult: ' + difficulty);
-    while (this.hash.substring(0, difficulty) !== Array(difficulty + 1).join("0")) {
-      this.nounce++;
-      this.hash = this.calculateHash();
-    }
+  static mine(lastBlock, data) {
+    var timestamp = Date.now();
+    var lastHash = lastBlock.hash;
+    var hash = Block.generateHash(timestamp, lastHash, data);
+    return new Block(timestamp, lastHash, hash, data);
+  }
+
+  static generateHash(timestamp, lastHash, data) {
+    return crypto.createHash('sha256').update(`${timestamp}${lastHash}${JSON.stringify(data)}`).digest('base64');
   }
 }
 
 class Blockchain {
   constructor() {
-    this.chain = [this.getGenesisBlock()];
-    this.difficultyLog = 16;
+    this.chain = [Block.genesis()];
   }
 
-  getGenesisBlock() {
-    return new Block(0, Date.now(), {}, "");
+  mineBlock(data) {
+    var block = Block.mine(this.chain[this.chain.length - 1], data);
+    this.chain.push(block);
+    return block;
   }
 
-  getLastBlock() {
-    return this.chain[this.chain.length - 1];
+  replaceChain(chain) {
+    if (this.validate(chain)) {
+      this.chain = chain;
+      return chain;
+    }
   }
 
-  addBlock(newBlock) {
-    newBlock.previousHash = this.getLastBlock().hash;
-    newBlock.mineBlock(Math.floor(Math.log2(this.difficultyLog++)));
-    this.chain.push(newBlock);
-  }
-
-  isChainValid() {
-    for (let i = 1; i < this.chain.length; i++) {
-      const currentBlock = this.chain[i];
-      const previousBlock = this.chain[i - 1];
-
-      if (currentBlock.hash !== currentBlock.calculateHash()) {
-        console.log("invalid hash");
-        return false;
-      }
-      if (currentBlock.previousHash !== previousBlock.hash) {
-        console.log("invalid previous hash");
+  validate(chain) {
+    if (this.chain.length > chain.length) {
+      console.log('Current chain is longer than new one');
+      return false;
+    }    
+    if(this.chain[0].data !== undefined){
+      console.log('Genesis data should be empty');
+      return false;
+    }
+    for (let i = 1; i < chain.length; i++) {
+      const block = chain[i];
+      const hash = Block.generateHash(block.timestamp, chain[i-1].hash, block.data);
+      if(hash !== block.hash){
+        console.log('invalid block');
         return false;
       }
     }
@@ -68,23 +63,33 @@ class Blockchain {
   }
 }
 
-const mlCoin = new Blockchain();
 
-const wallet = GUID.create().toString();
-for (let index = 1; index <= 10; index++) {
-  console.log('minning...');
-  mlCoin.addBlock(new Block(index++, Date.now(), {
-    wallet: wallet,
-    amount: 10.0
-  }));
+var bc = new Blockchain();
 
-  const walletTransactions = _.filter(mlCoin.chain, b => {
-    return b.data.wallet == wallet
-  });  
+//Valid mining
+bc.mineBlock({
+  value: 1
+});
+bc.mineBlock({
+  value: 2
+});
 
-  let walletAmount = 0; 
-  _.forEach(walletTransactions, b=>{
-    walletAmount += b.data.amount;
-  });
-  console.log('Wallet "' + wallet +' amount ": ml$', walletAmount);
-}
+//Should replace blockchain with a valid chain
+var newChain = bc.replaceChain(bc.chain);
+console.log('Valid chain: ', newChain);
+
+//SHOULD FAIL THE CHAIN REPLACE (shows 'invalid block' message and return undefined):
+var fakeChain = [...bc.chain];
+fakeChain[1].data = {value:10};
+console.log('Fake chain should be undefined: ', bc.replaceChain(fakeChain));
+
+
+// ---------//TESTING GENERATE BLOCKS
+var genesisBlock = Block.genesis();
+console.log(genesisBlock);
+
+var block1 = Block.mine(genesisBlock, {value: 1});
+console.log(block1);
+
+var block2 = Block.mine(block1, {value: 2});
+console.log(block2);

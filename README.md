@@ -1,4 +1,5 @@
 # blockchain
-Just a quick understanding of block chain
+Blockchain re-done after reading Blockchain documentation and
+(NEW)current code based on: https://www.udemy.com/build-blockchain
 
-based on: https://github.com/SavjeeTutorials/SavjeeCoin
+(OLD)initial code based on: https://github.com/SavjeeTutorials/SavjeeCoin
